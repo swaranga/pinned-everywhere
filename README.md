@@ -43,8 +43,9 @@ Right-click the toolbar icon → **Options** (or **Details → Extension options
 - Unpinning or closing a pinned tab only affects that window. It comes back the
   next time that window is checked: when you click the toolbar button, which
   restores missing pinned tabs in the current window, or when you save the options.
-- Incognito windows, app windows (`--app=...`, Omarchy web apps) and popups are
-  left alone.
+- Incognito windows, app windows (`--app=...`, Omarchy web apps), popups and
+  floating picture-in-picture windows (like the one Google Meet pops out when
+  you switch tabs during a call) are left alone.
 - A new window gets its tabs about 1.5 seconds after it opens. The delay lets
   session restore finish attaching tabs before the extension checks the window.
 
@@ -61,6 +62,7 @@ node test/smoke.mjs
 ```
 
 This loads the extension into a throwaway headless Chromium profile and checks
-startup, new windows, idempotency, single-window mode and session restore. It
+startup, new windows, idempotency, single-window mode, session restore and
+picture-in-picture windows. It
 needs Node 22+ and Chromium (`CHROME_BIN` overrides the binary), not Google
 Chrome, because Chrome no longer accepts `--load-extension`.

@@ -16,6 +16,14 @@ function enqueue(task) {
   return queue;
 }
 
+// Document Picture-in-Picture windows, such as the floating window Google Meet
+// pops out when you switch away from a call, report type "normal" but can't
+// hold tabs. Their only tab is a blank page opened from a tab in another window.
+function isPictureInPicture({ tabs = [] }) {
+  const [tab] = tabs;
+  return tabs.length === 1 && tabUrl(tab) === "about:blank" && tab.openerTabId !== undefined;
+}
+
 async function hasPinsElsewhere(windowId, entries) {
   const tabs = await chrome.tabs.query({ pinned: true, windowType: "normal" });
   return tabs.some((tab) => tab.windowId !== windowId && entries.some((entry) => matches(tab, entry)));
@@ -25,16 +33,23 @@ async function hasPinsElsewhere(windowId, entries) {
 // in configured order. Pinned tabs that already match are left where they are.
 async function reconcileWindow(windowId, { ignoreMode = false } = {}) {
   const { mode, entries } = await loadSettings();
-  const win = await chrome.windows.get(windowId).catch(() => null);
-  if (!win || win.type !== "normal" || win.incognito || !entries.length) return;
+  const win = await chrome.windows.get(windowId, { populate: true }).catch(() => null);
+  if (!win || win.type !== "normal" || win.incognito || isPictureInPicture(win) || !entries.length) return;
   if (mode === "single" && !ignoreMode && (await hasPinsElsewhere(windowId, entries))) return;
 
   let index = 0;
   for (const entry of entries) {
     const pinned = await chrome.tabs.query({ windowId, pinned: true });
-    const tab =
-      pinned.find((t) => matches(t, entry)) ??
-      (await chrome.tabs.create({ windowId, url: entry.url, pinned: true, active: false, index }));
+    let tab = pinned.find((t) => matches(t, entry));
+    if (!tab) {
+      tab = await chrome.tabs.create({ windowId, url: entry.url, pinned: true, active: false, index });
+      // A window that can't hold tabs makes Chrome open the tab in another
+      // window instead. Undo that rather than duplicating that window's tabs.
+      if (tab.windowId !== windowId) {
+        await chrome.tabs.remove(tab.id);
+        return;
+      }
+    }
     index = tab.index + 1;
   }
 }

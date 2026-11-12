@@ -1,6 +1,6 @@
 // Smoke test: loads the extension into a throwaway headless Chromium profile and
 // checks that windows get the configured pinned tabs exactly once, including
-// after a session restore.
+// after a session restore, and that picture-in-picture windows are left alone.
 //
 // Usage: node test/smoke.mjs        (set CHROME_BIN to override the browser)
 // Needs Chromium: branded Google Chrome ignores --load-extension since v137.
@@ -96,7 +96,7 @@ async function launch(extraArgs = []) {
     await exited;
   };
 
-  return { evaluate, close, kill: () => proc.kill() };
+  return { send, evaluate, close, kill: () => proc.kill() };
 }
 
 // Pinned tab hostnames per normal window, ordered by window id.
@@ -110,6 +110,28 @@ const pinnedPerWindow = (browser) =>
 
 const setSettings = (browser, settings) => browser.evaluate((s) => chrome.storage.local.set(s), settings);
 const openWindow = (browser) => browser.evaluate(() => chrome.windows.create({ url: "about:blank" }).then((w) => w.id));
+
+// Opens a Document Picture-in-Picture window, like the floating window Google
+// Meet pops out when you switch away from a call. That needs a user gesture in
+// a secure page, so request it from the extension's own options page.
+async function openPictureInPicture(browser) {
+  const url = await browser.evaluate(() => chrome.runtime.getURL("options.html"));
+  await browser.evaluate((u) => chrome.tabs.create({ url: u }), url);
+  let page;
+  for (let i = 0; i < 50 && !page; i++) {
+    const { targetInfos } = await browser.send("Target.getTargets");
+    page = targetInfos.find((t) => t.type === "page" && t.url === url);
+    if (!page) await sleep(100);
+  }
+  if (!page) throw new Error("options page not found");
+  const { sessionId } = await browser.send("Target.attachToTarget", { targetId: page.targetId, flatten: true });
+  const { exceptionDetails } = await browser.send(
+    "Runtime.evaluate",
+    { expression: "documentPictureInPicture.requestWindow()", awaitPromise: true, userGesture: true },
+    sessionId,
+  );
+  if (exceptionDetails) throw new Error(exceptionDetails.exception?.description ?? exceptionDetails.text);
+}
 
 let browser;
 try {
@@ -144,6 +166,12 @@ try {
   await sleep(WAIT_MS);
   assert.deepEqual(await pinnedPerWindow(browser), [EXPECTED, EXPECTED], "session restore adds no duplicates");
   console.log("ok - session restore adds no duplicates");
+
+  // Chrome reports these windows as "normal" but opens tabs aimed at them in another window.
+  await openPictureInPicture(browser);
+  await sleep(WAIT_MS);
+  assert.deepEqual(await pinnedPerWindow(browser), [EXPECTED, EXPECTED, []], "picture-in-picture adds no duplicates");
+  console.log("ok - picture-in-picture windows are left alone");
 
   await browser.close();
   browser = undefined;
