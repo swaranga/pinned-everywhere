@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Pinned Everywhere options</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        font: 14px system-ui, sans-serif;
+      }
+      body {
+        max-width: 44rem;
+        margin: 2rem auto;
+        padding: 0 1rem;
+      }
+      textarea {
+        width: 100%;
+        box-sizing: border-box;
+        font: 13px ui-monospace, monospace;
+      }
+      fieldset {
+        border: none;
+        padding: 0;
+        margin: 1rem 0;
+      }
+      fieldset label {
+        display: block;
+        margin: 0.25rem 0;
+      }
+      .hint {
+        opacity: 0.75;
+      }
+      #status {
+        margin-left: 0.5rem;
+        white-space: pre-line;
+      }
+      #status.error {
+        color: #d33;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Pinned Everywhere</h1>
+    <form>
+      <label for="entries"><strong>Pinned tabs</strong>, one per line, in order:</label>
+      <textarea id="entries" name="entries" rows="8" spellcheck="false"></textarea>
+      <p class="hint">
+        Format: <code>&lt;url&gt; [match-prefix]</code>. A window counts as already having a tab when
+        one of its pinned tabs' URL starts with the match prefix, which defaults to the URL's origin
+        (for example <code>https://mail.google.com/</code>). Use a longer prefix such as
+        <code>https://mail.google.com/mail/u/1/</code> to tell accounts apart. Lines starting with
+        <code>#</code> are ignored.
+      </p>
+      <fieldset>
+        <legend><strong>Windows</strong></legend>
+        <label><input type="radio" name="mode" value="all" /> Every window</label>
+        <label>
+          <input type="radio" name="mode" value="single" />
+          One window: a new window gets them only when no other window has them
+        </label>
+      </fieldset>
+      <button type="submit">Save</button>
+      <button type="button" id="defaults">Reset to defaults</button>
+      <span id="status" role="status"></span>
+    </form>
+    <script type="module" src="options.js"></script>
+  </body>
+</html>
